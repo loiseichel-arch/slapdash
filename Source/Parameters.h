@@ -26,6 +26,8 @@ namespace id
     inline constexpr const char* volt       = "slapdash";   // the "Slapdash" fader (battery voltage)
     inline constexpr const char* bands      = "bands";
     inline constexpr const char* layer      = "layer";
+    inline constexpr const char* active     = "active";     // On / bypass of the whole plugin
+    inline constexpr const char* link       = "link";       // bands move together
     inline constexpr std::array<const char*, 3> xover { "xover1", "xover2", "xover3" };
 }
 
@@ -55,10 +57,11 @@ inline juce::String bandId (int bandIndex, const char* name)   // bandIndex 0..3
     return "b" + juce::String (bandIndex + 1) + "_" + name;
 }
 
-inline juce::StringArray typeNames() { return { "Tube", "Tape", "Transistor", "Diode" }; }
+// Stored as an index: renaming a type keeps old sessions working.
+inline juce::StringArray typeNames() { return { "Tube", "Tape", "Fuzz", "Screamer" }; }
 
 inline constexpr float minHz = 20.0f, maxHz = 20000.0f;
-inline constexpr float gainRangeDb = 12.0f;
+inline constexpr float gainMinDb = -24.0f, gainMaxDb = 12.0f;   // band gain
 
 // ---- Value formatting (English only) ----
 inline juce::String fmtHzValue (float v)
@@ -131,6 +134,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     }
     addFloat (id::mix,       "Mix",        pct, 100.0f, fmtPct, "%");
     addFloat (id::output,    "Output",     NormalisableRange<float> (-24.0f, 12.0f, 0.1f), 0.0f, fmtDb, "dB");
+    addBool  (id::active,     "On",          true);
     addBool  (id::autoGain,   "Auto Gain",   true);
     addBool  (id::speakerSim, "Speaker Sim", false);
     addFloat (id::volt,      "Slapdash",   NormalisableRange<float> (0.0f, 9.0f, 0.01f), 9.0f, fmtVolt, "V");
@@ -138,6 +142,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     // ---- Bands ----
     layout.add (std::make_unique<AudioParameterInt> (ParameterID { id::bands, 1 }, "Bands", 1, maxBands, 1));
     addBool (id::layer, "Layer Mode", false);
+    addBool (id::link,  "Link Bands", false);
     for (int i = 0; i < 3; ++i)
         addFloat (id::xover[(size_t) i], "Split " + String (i + 1), logRange (30.0f, 16000.0f),
                   xoverDefaults[(size_t) i], fmtHz, "Hz");
@@ -152,7 +157,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
         addFloat (bandId (b, band::sag),   n + "Sag",   pct, 0.0f,  fmtPct, "%");
         addFloat (bandId (b, band::grit),  n + "Grit",  pct, 0.0f,  fmtPct, "%");
         addFloat (bandId (b, band::mix),   n + "Mix",   pct, 100.0f, fmtPct, "%");
-        addFloat (bandId (b, band::gain),  n + "Gain",  NormalisableRange<float> (-gainRangeDb, gainRangeDb, 0.1f),
+        addFloat (bandId (b, band::gain),  n + "Gain",  NormalisableRange<float> (gainMinDb, gainMaxDb, 0.1f),
                   0.0f, fmtDb, "dB");
         addFloat (bandId (b, band::pan),   n + "Pan",   NormalisableRange<float> (-100.0f, 100.0f, 1.0f),
                   0.0f, fmtPan, "");

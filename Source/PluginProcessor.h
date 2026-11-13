@@ -7,6 +7,7 @@
 #include <memory>
 #include "dsp/Saturation.h"
 #include "Parameters.h"
+#include "LinkManager.h"
 
 class SlapdashProcessor : public juce::AudioProcessor
 {
@@ -41,6 +42,7 @@ public:
     bool isMono() const { return getTotalNumOutputChannels() < 2; }
 
     juce::AudioProcessorValueTreeState apvts;
+    LinkManager link { apvts };
 
 private:
     static constexpr int B = params::maxBands;
@@ -54,7 +56,7 @@ private:
     struct Raw
     {
         std::atomic<float> *input, *lowCut, *highCut, *monoMaker, *mix, *output, *autoGain, *speakerSim, *volt,
-                           *bands, *layer;
+                           *bands, *layer, *active;
         std::array<std::atomic<float>*, 3> xover {};
         std::array<BandRaw, B> band {};
     } raw {};

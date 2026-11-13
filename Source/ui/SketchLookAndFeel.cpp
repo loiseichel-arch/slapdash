@@ -8,6 +8,10 @@ SketchLookAndFeel::SketchLookAndFeel()
     setColour (juce::TooltipWindow::backgroundColourId, colour::knob);
     setColour (juce::TooltipWindow::textColourId, colour::ink);
     setColour (juce::TooltipWindow::outlineColourId, colour::ink);
+    setColour (juce::PopupMenu::backgroundColourId, colour::knob);
+    setColour (juce::PopupMenu::textColourId, colour::ink);
+    setColour (juce::PopupMenu::highlightedBackgroundColourId, colour::accent);
+    setColour (juce::PopupMenu::highlightedTextColourId, colour::knob);
 }
 
 void SketchLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,

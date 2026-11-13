@@ -94,10 +94,10 @@ public:
                 break;
             }
             case What::splitGain:
-                set (drag.param, juce::jlimit (-params::gainRangeDb, params::gainRangeDb, yToGain (pos.y)));
+                set (drag.param, juce::jlimit (params::gainMinDb, params::gainMaxDb, yToGain (pos.y)));
                 break;
             case What::layerGain:
-                set (drag.param, juce::jlimit (-params::gainRangeDb, params::gainRangeDb,
+                set (drag.param, juce::jlimit (params::gainMinDb, params::gainMaxDb,
                                                drag.startA + (drag.startY - pos.y) * 0.1f));
                 break;
             case What::layerLo:
@@ -175,15 +175,18 @@ private:
         const float t = juce::jlimit (0.0f, 1.0f, (x - in.getX()) / in.getWidth());
         return params::minHz * std::pow (params::maxHz / params::minHz, t);
     }
+    // Gain line: +12 dB near the top, -24 dB near the bottom of the strip.
+    float gainTop() const    { return inner().getY() + 24.0f; }
+    float gainBottom() const { return inner().getBottom() - 24.0f; }
     float gainToY (float db) const
     {
-        const auto in = inner();
-        return in.getCentreY() + 8.0f - db / params::gainRangeDb * (in.getHeight() * 0.34f);
+        const float t = (db - params::gainMinDb) / (params::gainMaxDb - params::gainMinDb);
+        return gainBottom() - t * (gainBottom() - gainTop());
     }
     float yToGain (float y) const
     {
-        const auto in = inner();
-        return (in.getCentreY() + 8.0f - y) / (in.getHeight() * 0.34f) * params::gainRangeDb;
+        const float t = (gainBottom() - y) / (gainBottom() - gainTop());
+        return params::gainMinDb + t * (params::gainMaxDb - params::gainMinDb);
     }
 
     juce::Rectangle<float> laneRect (int b) const

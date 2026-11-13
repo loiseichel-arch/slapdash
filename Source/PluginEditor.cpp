@@ -17,6 +17,13 @@ SlapdashEditor::SlapdashEditor (SlapdashProcessor& p)
         if (target == 1 && ! strip.isLayer()) enterLayer();
     };
     addAndMakeVisible (modeSelector);
+
+    onSwitch.attach (st, pid::active);
+    onSwitch.setTooltip ("plugin on / bypass (alt-click to reset)");
+    addAndMakeVisible (onSwitch);
+    linkButton.attach (st, pid::link);
+    linkButton.setTooltip ("move all bands together, keeping their offsets (alt-click to reset)");
+    addAndMakeVisible (linkButton);
     addAndMakeVisible (strip);
 
     // ---- Modules ----
@@ -26,7 +33,7 @@ SlapdashEditor::SlapdashEditor (SlapdashProcessor& p)
         panel->onRemove = [this] (int index) { removeBand (index); };
         addChildComponent (panel);
     }
-    addButton.onClick = [this] { addBand(); };
+    addButton.onClick = [this] { showAddMenu(); };
     addChildComponent (addButton);
 
     volt.attach (st, pid::volt);
@@ -93,17 +100,44 @@ void SlapdashEditor::timerCallback()
 {
     updateLayout (false);
     strip.repaint();
+
+    // Bypassed: everything but the header fades back.
+    const bool on = onSwitch.getToggleState();
+    if (on != shownOn)
+    {
+        shownOn = on;
+        for (juce::Component* c : std::initializer_list<juce::Component*> { &strip, &addButton, &volt })
+            c->setAlpha (on ? 1.0f : 0.45f);
+        for (auto* p : panels) p->setAlpha (on ? 1.0f : 0.45f);
+    }
     for (auto* p : panels)
         if (p->isVisible()) p->refreshValues();
 }
 
 // ---- Adding and removing bands ----
-void SlapdashEditor::addBand()
+void SlapdashEditor::showAddMenu()
+{
+    juce::PopupMenu m;
+    m.setLookAndFeel (&laf);
+    m.addItem (1, "Add");
+    m.addItem (2, "Duplicate");
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&addButton),
+                     [safe = juce::Component::SafePointer<SlapdashEditor> (this)] (int choice)
+                     {
+                         if (safe != nullptr && choice > 0) safe->addBand (choice == 2);
+                     });
+}
+
+// Add: a new band with default settings. Duplicate: a copy of the band next
+// to it (also its frequency range in Layer mode).
+void SlapdashEditor::addBand (bool duplicate)
 {
     const int n = strip.numBands();
     if (n >= params::maxBands) return;
 
+    LinkManager::Suspend noLink (proc.link);
     resetBand (n);
+    if (duplicate) copyBand (n - 1, n);
 
     // New split point: halfway (on a log scale) through the top band.
     const auto edges = strip.splitEdges();
@@ -120,6 +154,7 @@ void SlapdashEditor::removeBand (int index)
     const int n = strip.numBands();
     if (n <= 1 || index < 0 || index >= n) return;
 
+    LinkManager::Suspend noLink (proc.link);
     // Split points: the removed band merges with its neighbour.
     std::vector<float> splits;
     for (int k = 0; k < n - 1; ++k) splits.push_back (paramValue (proc.apvts.getParameter (pid::xover[(size_t) k])));
@@ -153,6 +188,7 @@ void SlapdashEditor::resetBand (int index)
 // Going to Layer mode: each band starts on the range it had in Split mode.
 void SlapdashEditor::enterLayer()
 {
+    LinkManager::Suspend noLink (proc.link);
     const auto edges = strip.splitEdges();
     for (int b = 0; b < strip.numBands(); ++b)
     {
@@ -181,8 +217,8 @@ void SlapdashEditor::paint (juce::Graphics& g)
         g.drawText ("DASH", juce::Rectangle<float> ((float) pad + wSlap, (float) headerY, 200.0f, 60.0f), juce::Justification::centredLeft, false);
     }
     g.setColour (colour::soft);
-    g.setFont (fonts->hand (16.0f));
-    g.drawText ("Planet Gloria", juce::Rectangle<float> (W - (float) pad - 120.0f, (float) headerY + 18.0f, 120.0f, 24.0f),
+    g.setFont (fonts->hand (14.0f));
+    g.drawText ("Planet Gloria", juce::Rectangle<float> (W - (float) pad - 160.0f, 12.0f, 160.0f, 18.0f),
                 juce::Justification::centredRight, false);
 
     // Slapdash column (dark, like the battery compartment).
@@ -216,8 +252,12 @@ void SlapdashEditor::resized()
     const int n = strip.numBands();
 
     // Header.
+    // Header, right side: on/off, Link, Split/Layer ("Planet Gloria" above).
     const int selW = modeSelector.idealWidth();
-    modeSelector.setBounds (W - pad - 120 - 16 - selW, headerY + 16, selW, 30);
+    const int hy = headerY + 18;
+    modeSelector.setBounds (W - pad - selW, hy, selW, 30);
+    linkButton.setBounds (modeSelector.getX() - 14 - 106, hy - 1, 106, 32);
+    onSwitch.setBounds (linkButton.getX() - 14 - 80, hy, 80, 30);
 
     strip.setBounds (pad, stripY, W - 2 * pad, stripH);
 

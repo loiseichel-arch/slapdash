@@ -21,7 +21,8 @@ private:
     void updateLayout (bool force);
     int  windowWidth (int bands) const;
 
-    void addBand();
+    void showAddMenu();
+    void addBand (bool duplicate);
     void removeBand (int index);
     void copyBand (int from, int to);
     void resetBand (int index);
@@ -35,6 +36,8 @@ private:
     juce::SharedResourcePointer<sketch::Fonts> fonts;
     juce::TooltipWindow tooltips { this, 600 };
 
+    ResetToggle onSwitch { "on", true };
+    PillToggle linkButton { "Link", false };
     ChoiceSelector modeSelector;
     BandStrip strip;
     juce::OwnedArray<BandPanel> panels;
@@ -47,7 +50,7 @@ private:
     PillToggle autoGain { "Auto gain", true }, speakerSim { "Speaker sim", false };
 
     int shownBands = -1;
-    bool shownLayer = false, shownMono = false;
+    bool shownLayer = false, shownMono = false, shownOn = true;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SlapdashEditor)
 };

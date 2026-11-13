@@ -19,7 +19,7 @@ SlapdashProcessor::SlapdashProcessor()
     raw.input  = get (pid::input);   raw.lowCut   = get (pid::lowCut);   raw.highCut    = get (pid::highCut);
     raw.monoMaker = get (pid::monoMaker); raw.mix = get (pid::mix);      raw.output     = get (pid::output);
     raw.autoGain = get (pid::autoGain); raw.speakerSim = get (pid::speakerSim); raw.volt = get (pid::volt);
-    raw.bands  = get (pid::bands);   raw.layer    = get (pid::layer);
+    raw.bands  = get (pid::bands);   raw.layer    = get (pid::layer);   raw.active = get (pid::active);
     for (int i = 0; i < 3; ++i) raw.xover[(size_t) i] = get (pid::xover[(size_t) i]);
 
     using namespace params;
@@ -355,10 +355,12 @@ void SlapdashProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     }
 
     // ---- Global Mix, then Output ----
-    dryWet.setWetMixProportion (juce::jlimit (0.0f, 1.0f, raw.mix->load() * 0.01f));
+    // Off = bypass: the dry signal only (delayed like the wet one, no click).
+    const bool on = raw.active->load() > 0.5f;
+    dryWet.setWetMixProportion (on ? juce::jlimit (0.0f, 1.0f, raw.mix->load() * 0.01f) : 0.0f);
     dryWet.mixWetSamples (block);
 
-    outGain.setTargetValue (juce::Decibels::decibelsToGain (raw.output->load()));
+    outGain.setTargetValue (on ? juce::Decibels::decibelsToGain (raw.output->load()) : 1.0f);
     for (int i = 0; i < n; ++i)
     {
         const float g = outGain.getNextValue();

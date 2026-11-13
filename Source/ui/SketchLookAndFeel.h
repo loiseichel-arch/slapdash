@@ -24,5 +24,7 @@ public:
                            float sliderPos, float minSliderPos, float maxSliderPos,
                            juce::Slider::SliderStyle, juce::Slider&) override;
 
+    juce::Font getPopupMenuFont() override { return fonts->hand (18.0f); }
+
     juce::SharedResourcePointer<sketch::Fonts> fonts;
 };
