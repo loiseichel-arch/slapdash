@@ -47,7 +47,7 @@ cmake -B build -G Xcode
 cmake --build build --config Release
 ```
 
-Sur Windows (Visual Studio 2022) : `cmake -B build -G "Visual Studio 17 2022" -A x64` puis `cmake --build build --config Release`.
+Sur Windows (Visual Studio) : `cmake -B build -A x64` puis `cmake --build build --config Release`.
 
 Ou sans rien installer : chaque envoi sur GitHub lance la compilation dans l'onglet **Actions**. Quand elle est verte, télécharge en bas de la page **Slapdash-macOS-…** (Mac, universel, macOS 11 et plus) ou **Slapdash-Windows** (Windows 64 bits : VST3, AAX, app), puis suis `INSTALL_MAC.txt` ou `INSTALL_WINDOWS.txt`.
 
