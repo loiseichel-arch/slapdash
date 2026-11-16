@@ -38,6 +38,17 @@ Réglages à l'ouverture : 1 module pleine bande, Split, on, Link OFF, Auto gain
 - Bouton **on** (bypass général), bouton **Link**, menu **Add / Duplicate**.
 - Gain de bande jusqu'à **−24 dB**.
 
+## Télécharger et installer
+
+Chaque envoi sur GitHub compile le plugin (onglet **Actions**, environ 15 minutes) et fabrique deux installateurs :
+
+- **Mac** : `Slapdash-<version>-mac.dmg`. Ouvre-le, double-clique sur « Install Slapdash.pkg » et choisis les formats (VST3, Audio Unit, app ; AAX en option). Universel Apple Silicon + Intel, macOS 11 et plus. L'installateur n'est pas signé par Apple : la première fois, fais clic droit > Ouvrir, ou Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ». Plus besoin du Terminal ni de `sudo xattr` : les fichiers installés par l'installateur ne sont pas mis en quarantaine.
+- **Windows** : `Slapdash-<version>-windows-setup.exe` (VST3 et app ; AAX en option), 64 bits. Non signé : si Windows affiche « Windows a protégé votre ordinateur », clique sur « Informations complémentaires » puis « Exécuter quand même ».
+
+Pour donner le plugin à quelqu'un : une version marquée d'une étiquette (`v0.3.0`…) publie les deux installateurs sur la page **Releases** du dépôt, téléchargeables sans compte GitHub. Les fichiers de l'onglet Actions, eux, demandent d'être connecté et disparaissent après 30 jours.
+
+Les scripts : `installer/mac/make_dmg.sh` et `installer/windows/installer.iss`.
+
 ## Compiler
 
 Comme Malade. Sur Mac, avec Xcode et CMake :
@@ -49,7 +60,6 @@ cmake --build build --config Release
 
 Sur Windows (Visual Studio) : `cmake -B build -A x64` puis `cmake --build build --config Release`.
 
-Ou sans rien installer : chaque envoi sur GitHub lance la compilation dans l'onglet **Actions**. Quand elle est verte, télécharge en bas de la page **Slapdash-macOS-…** (Mac, universel, macOS 11 et plus) ou **Slapdash-Windows** (Windows 64 bits : VST3, AAX, app), puis suis `INSTALL_MAC.txt` ou `INSTALL_WINDOWS.txt`.
 
 ## Polices
 
