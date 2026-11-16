@@ -51,11 +51,11 @@ private:
     // Direct pointers to the parameter values (no lookups on the audio thread).
     struct BandRaw
     {
-        std::atomic<float> *type, *drive, *more, *sag, *grit, *mix, *gain, *pan, *solo, *mute, *bypass, *lo, *hi;
+        std::atomic<float> *type, *drive, *more, *sag, *mix, *gain, *pan, *solo, *mute, *bypass, *lo, *hi;
     };
     struct Raw
     {
-        std::atomic<float> *input, *lowCut, *highCut, *monoMaker, *mix, *output, *autoGain, *speakerSim, *volt,
+        std::atomic<float> *input, *lowCut, *highCut, *monoMaker, *mix, *output, *autoGain, *speakerSim, *volt, *slapMode,
                            *bands, *layer, *active;
         std::array<std::atomic<float>*, 3> xover {};
         std::array<BandRaw, B> band {};
@@ -65,7 +65,7 @@ private:
     {
         slap::BandSaturator sat;
         juce::SmoothedValue<float> mix, gain, panL, panR, audible;
-        float drive = 0.3f, more = 0.0f, sag = 0.0f, grit = 0.0f;   // smoothed per block
+        float course = 0.3f, sag = 0.0f;   // smoothed per block (course = Drive + More, 0..2)
         juce::dsp::LinkwitzRileyFilter<float> layerHp, layerLp;
         std::array<juce::dsp::LinkwitzRileyFilter<float>, 3> allpass;  // phase match for the splits above it
     };

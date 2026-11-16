@@ -1,4 +1,4 @@
-# Slapdash v0.2
+# Slapdash v0.3
 
 Saturation multibande de **Planet Gloria** (AAX pour Pro Tools, plus AU, VST3 et une app autonome pour tester), écrite avec JUCE. Même famille visuelle que Malade : interface dessinée à la main.
 
@@ -6,30 +6,39 @@ Saturation multibande de **Planet Gloria** (AAX pour Pro Tools, plus AU, VST3 et
 
 - **1 à 4 modules de disto identiques**, un par bande. Le bouton **+ band** propose **Add** (bande neuve, réglages par défaut) ou **Duplicate** (copie de la bande voisine, y compris sa plage de fréquences en mode Layer). Le **−** d'un module le retire.
 - Par module :
-  - **Type**, chacun un petit circuit complet (filtrage avant et après l'écrêtage) :
-    - **Tube** : médiums poussés, asymétrie qui grandit quand on attaque (harmoniques paires), haut doux. Chaud, gras.
-    - **Tape** : les aigus saturent en premier (accentuation / désaccentuation), hystérésis douce, bosse de tête vers 90 Hz. Rond, compressé.
-    - **Fuzz** : gain énorme, écrêtage dur asymétrique, médiums creusés, se ferme sur les notes faibles.
-    - **Screamer** : seuls les médiums vont dans les diodes, le grave reste propre (façon Tube Screamer). Serré, médium. Sur un signal très grave, il sonne plus bas en volume (le grave ne passe pas dans l'écrêtage) ; l'Auto gain compense.
-  - **Drive** (0 à +40 dB) et **More** (2e étage en cascade, 0 à +30 dB).
+  - **Type** :
+    - **Transistor** : neutre. Écrêtage symétrique, aucun filtre.
+    - **Tube** : un peu plus de médiums dans l'écrêtage, asymétrie qui grandit quand on attaque (harmoniques paires), haut adouci.
+    - **Tape** : les aigus saturent en premier (accentuation / désaccentuation), hystérésis douce, petite bosse de tête vers 90 Hz.
+    - **Fuzz** : gain en plus, écrêtage dur asymétrique, médiums légèrement creusés.
+    - La couleur des filtres grandit avec le Drive : peu de Drive = son ouvert (plat à ±1,5 dB jusqu'à 15 kHz à 30 %), la couleur vient quand on pousse. Le Transistor ne filtre jamais.
+  - **Drive** (0 à +40 dB) et l'interrupteur **More**, qui prolonge la course : Drive à fond sans More = Drive à zéro avec More (jusqu'à +80 dB).
   - **Sag** : une alimentation qui se vide sur les attaques fortes (4 ms) et se recharge lentement (280 ms) : le point d'écrêtage baisse, l'attaque s'écrase, puis la note « respire ».
-  - **Grit** : jusqu'à 50 %, une râpe aiguë franche ; au-delà, une fuzz à l'octave du dessus s'ajoute (redressement, façon Octavia).
   - **Mix** : mélange propre / saturé de la bande.
   - **Pan** (stéréo seulement, grisé en mono) et **Gain** de bande (−24 à +12 dB, après le Mix).
   - **S / M / B** : Solo, Mute, Bypass (visibles à partir de 2 bandes).
   - Compensation de niveau intégrée, mesurée pour chaque type (`Source/dsp/CompTable.h`, refaite avec `tools/calibrate_comp.cpp`) : à −18 dBFS, monter Drive et More change la couleur, pas le volume.
 - **En-tête** :
   - **on** : allume ou contourne tout le plugin (le son passe intact, sans clic).
-  - **Link** : les bandes bougent ensemble. Tourner Drive, More, Sag, Grit, Mix ou Gain sur une bande déplace le même réglage des autres bandes **du même écart**, chacune depuis sa propre valeur. Une bande qui arrive en butée s'y arrête, les autres continuent. Le Type et le Pan restent indépendants.
+  - **Link** : les bandes bougent ensemble. Tourner Drive, Sag, Mix ou Gain (ou basculer More) sur une bande déplace le même réglage des autres bandes **du même écart**, chacune depuis sa propre valeur. Une bande qui arrive en butée s'y arrête, les autres continuent. Le Type et le Pan restent indépendants.
 - **Bandeau du haut** :
   - **Split** (par défaut) : les bandes se partagent le spectre. On fait glisser les fréquences de coupure (↔), et on monte ou descend le trait de gain de chaque bande. La somme des bandes sans disto redonne exactement le son d'origine (filtres Linkwitz-Riley avec compensation de phase).
   - **Layer** : chaque bande a sa propre plage et elles peuvent se superposer (deux distos sur les mêmes fréquences, une à gauche, une à droite). On tire un bord ou le milieu d'une barre. Les bords **s'aimantent** sur ceux des autres bandes et sur 20 Hz / 20 kHz ; **Cmd + glisser** (Ctrl sur Windows) pour régler sans aimantation. Le gain se règle en glissant verticalement sur l'étiquette « Band n · 0 dB ↕ ».
-- **Fader Slapdash** : la pile de la pédale, de 9 V (neuve) à 0 V (morte). En descendant : polarisation décalée, plus de crasse, moins de niveau, et des fins de notes qui crachotent puis se coupent.
+- **Fader Slapdash** : la pile de la pédale, de 9 V (neuve) à 0 V (morte). En descendant : polarisation décalée, plus de crasse, moins de niveau. Sous le fader, **gate** (par défaut) : les fins de notes crachotent puis se coupent ; **open** : la même couleur, sans gate.
 - **Master** : Input, Low cut, High cut, **Mono maker** (tout ce qui est sous la fréquence passe en mono, Off à 0, jusqu'à 1000 Hz), Mix, Output, **Auto gain** (égalise lentement le volume de sortie sur l'entrée) et **Speaker sim** (un haut-parleur seul, sans ampli).
 - **Alt + clic** sur n'importe quel réglage (potard, fader, bouton, trait de gain, fréquence de coupure, bord de bande) : retour à la valeur par défaut. Double-clic aussi sur les potards et faders.
 - Suréchantillonnage ×4 de toute la partie disto, pour éviter le repliement (aliasing).
 
 Réglages à l'ouverture : 1 module pleine bande, Split, on, Link OFF, Auto gain ON, Speaker sim OFF, Mono maker Off, Slapdash 9 V.
+
+## Nouveau en v0.3
+
+- Types dans l'ordre **Transistor** (nouveau, neutre), **Tube**, **Tape**, **Fuzz** ; le Screamer disparaît (il faisait redite avec le Speaker sim). Les sessions existantes changent de type.
+- Filtres de couleur plus doux et qui grandissent avec le Drive : plus de son terne à faible Drive (sur un bus batterie par exemple).
+- La Fuzz ne coupe plus les notes faibles d'elle-même.
+- **More** devient un interrupteur qui prolonge la course du Drive.
+- **Grit** supprimé.
+- Fader Slapdash : mode **gate / open**.
 
 ## Nouveau en v0.2
 
@@ -73,7 +82,7 @@ Constructeur **Planet Gloria**, code constructeur `Pglo`, code plugin `Slpd`, id
 
 ```
 Source/
-  dsp/Saturation.h           la disto d'une bande (types, Drive, More, Sag, Grit, pile)
+  dsp/Saturation.h           la disto d'une bande (types, Drive, More, Sag, pile)
   dsp/CompTable.h            compensation de niveau mesurée par type
   LinkManager.h              le bouton Link
   Parameters.h               tous les paramètres automatisables

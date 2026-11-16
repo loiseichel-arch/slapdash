@@ -3,7 +3,7 @@
 // knob on the other bands by the same amount, from their own value, so the
 // offsets between bands are kept. A band that hits its end stops there and
 // the others carry on.
-// Linked: Drive, More, Sag, Grit, Mix, Gain (not Type, not Pan).
+// Linked: Drive, More (switch), Sag, Mix, Gain (not Type, not Pan).
 // Only gestures made in the interface are passed on (host automation is
 // left alone, it already holds every band's own curve).
 
@@ -17,9 +17,9 @@
 class LinkManager : private juce::AudioProcessorParameter::Listener
 {
 public:
-    static constexpr std::array<const char*, 6> linked {
+    static constexpr std::array<const char*, 5> linked {
         params::band::drive, params::band::more, params::band::sag,
-        params::band::grit,  params::band::mix,  params::band::gain };
+        params::band::mix,   params::band::gain };
 
     explicit LinkManager (juce::AudioProcessorValueTreeState& s)
     {

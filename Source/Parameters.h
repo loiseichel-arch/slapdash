@@ -24,6 +24,7 @@ namespace id
     inline constexpr const char* autoGain   = "autoGain";
     inline constexpr const char* speakerSim = "speakerSim";
     inline constexpr const char* volt       = "slapdash";   // the "Slapdash" fader (battery voltage)
+    inline constexpr const char* slapMode   = "slapMode";   // gate / open
     inline constexpr const char* bands      = "bands";
     inline constexpr const char* layer      = "layer";
     inline constexpr const char* active     = "active";     // On / bypass of the whole plugin
@@ -38,7 +39,6 @@ namespace band
     inline constexpr const char* drive  = "drive";
     inline constexpr const char* more   = "more";
     inline constexpr const char* sag    = "sag";
-    inline constexpr const char* grit   = "grit";
     inline constexpr const char* mix    = "mix";
     inline constexpr const char* gain   = "gain";
     inline constexpr const char* pan    = "pan";
@@ -48,7 +48,7 @@ namespace band
     inline constexpr const char* lo     = "lo";     // Layer mode: low edge
     inline constexpr const char* hi     = "hi";     // Layer mode: high edge
 
-    inline constexpr std::array<const char*, 13> all { type, drive, more, sag, grit, mix, gain, pan,
+    inline constexpr std::array<const char*, 12> all { type, drive, more, sag, mix, gain, pan,
                                                        solo, mute, bypass, lo, hi };
 }
 
@@ -58,7 +58,7 @@ inline juce::String bandId (int bandIndex, const char* name)   // bandIndex 0..3
 }
 
 // Stored as an index: renaming a type keeps old sessions working.
-inline juce::StringArray typeNames() { return { "Tube", "Tape", "Fuzz", "Screamer" }; }
+inline juce::StringArray typeNames() { return { "Transistor", "Tube", "Tape", "Fuzz" }; }
 
 inline constexpr float minHz = 20.0f, maxHz = 20000.0f;
 inline constexpr float gainMinDb = -24.0f, gainMaxDb = 12.0f;   // band gain
@@ -138,6 +138,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     addBool  (id::autoGain,   "Auto Gain",   true);
     addBool  (id::speakerSim, "Speaker Sim", false);
     addFloat (id::volt,      "Slapdash",   NormalisableRange<float> (0.0f, 9.0f, 0.01f), 9.0f, fmtVolt, "V");
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { id::slapMode, 1 }, "Slapdash Mode",
+                                                        StringArray { "gate", "open" }, 0));
 
     // ---- Bands ----
     layout.add (std::make_unique<AudioParameterInt> (ParameterID { id::bands, 1 }, "Bands", 1, maxBands, 1));
@@ -153,9 +155,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
         layout.add (std::make_unique<AudioParameterChoice> (ParameterID { bandId (b, band::type), 1 },
                                                             n + "Type", typeNames(), 0));
         addFloat (bandId (b, band::drive), n + "Drive", pct, 30.0f, fmtPct, "%");
-        addFloat (bandId (b, band::more),  n + "More",  pct, 0.0f,  fmtPct, "%");
+        addBool  (bandId (b, band::more),  n + "More",  false);   // extends the Drive by another full course
         addFloat (bandId (b, band::sag),   n + "Sag",   pct, 0.0f,  fmtPct, "%");
-        addFloat (bandId (b, band::grit),  n + "Grit",  pct, 0.0f,  fmtPct, "%");
         addFloat (bandId (b, band::mix),   n + "Mix",   pct, 100.0f, fmtPct, "%");
         addFloat (bandId (b, band::gain),  n + "Gain",  NormalisableRange<float> (gainMinDb, gainMaxDb, 0.1f),
                   0.0f, fmtDb, "dB");

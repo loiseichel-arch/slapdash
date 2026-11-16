@@ -19,6 +19,7 @@ SlapdashProcessor::SlapdashProcessor()
     raw.input  = get (pid::input);   raw.lowCut   = get (pid::lowCut);   raw.highCut    = get (pid::highCut);
     raw.monoMaker = get (pid::monoMaker); raw.mix = get (pid::mix);      raw.output     = get (pid::output);
     raw.autoGain = get (pid::autoGain); raw.speakerSim = get (pid::speakerSim); raw.volt = get (pid::volt);
+    raw.slapMode = get (pid::slapMode);
     raw.bands  = get (pid::bands);   raw.layer    = get (pid::layer);   raw.active = get (pid::active);
     for (int i = 0; i < 3; ++i) raw.xover[(size_t) i] = get (pid::xover[(size_t) i]);
 
@@ -28,7 +29,7 @@ SlapdashProcessor::SlapdashProcessor()
         auto& r = raw.band[(size_t) b];
         r.type  = get (bandId (b, band::type));  r.drive = get (bandId (b, band::drive));
         r.more  = get (bandId (b, band::more));  r.sag   = get (bandId (b, band::sag));
-        r.grit  = get (bandId (b, band::grit));  r.mix   = get (bandId (b, band::mix));
+        r.mix   = get (bandId (b, band::mix));
         r.gain  = get (bandId (b, band::gain));  r.pan   = get (bandId (b, band::pan));
         r.solo  = get (bandId (b, band::solo));  r.mute  = get (bandId (b, band::mute));
         r.bypass = get (bandId (b, band::bypass));
@@ -190,15 +191,17 @@ void SlapdashProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         auto& bd = bands[(size_t) b];
 
         auto follow = [] (float& v, float target) { v += 0.35f * (target - v); };
-        follow (bd.drive, r.drive->load() * 0.01f);
-        follow (bd.more,  r.more->load()  * 0.01f);
-        follow (bd.sag,   r.sag->load()   * 0.01f);
-        follow (bd.grit,  r.grit->load()  * 0.01f);
+        // Drive course 0..2 (More adds a full course), glided so the More switch does not click.
+        follow (bd.course, slap::driveCourse (r.drive->load() * 0.01f, r.more->load() > 0.5f));
+        follow (bd.sag,    r.sag->load() * 0.01f);
 
         slap::BandSettings s;
         s.type   = (slap::Type) juce::jlimit (0, 3, juce::roundToInt (r.type->load()));
-        s.drive  = bd.drive; s.more = bd.more; s.sag = bd.sag; s.grit = bd.grit;
+        s.more   = bd.course > 1.0f;
+        s.drive  = s.more ? bd.course - 1.0f : bd.course;
+        s.sag    = bd.sag;
         s.starve = starve;
+        s.batteryGate = juce::roundToInt (raw.slapMode->load()) == 0;
         bd.sat.setSettings (s);
 
         bd.mix.setTargetValue (r.mix->load() * 0.01f);

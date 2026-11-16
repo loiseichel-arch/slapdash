@@ -44,6 +44,7 @@ private:
     SketchActionButton addButton { SketchActionButton::Kind::addBand };
 
     SketchFader volt { "slapdash", true };
+    ChoiceSelector slapMode;
 
     SketchKnob input { "Input", 42 }, lowCut { "Low cut", 42 }, highCut { "High cut", 42 },
                monoMaker { "Mono maker", 42 }, mix { "Mix", 42 }, output { "Output", 42 };

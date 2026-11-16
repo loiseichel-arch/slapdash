@@ -6,7 +6,8 @@ namespace pid = params::id;
 SlapdashEditor::SlapdashEditor (SlapdashProcessor& p)
     : AudioProcessorEditor (&p), proc (p),
       modeSelector (*p.apvts.getParameter (pid::layer), { "Split", "Layer" }, true),
-      strip (p.apvts)
+      strip (p.apvts),
+      slapMode (*p.apvts.getParameter (pid::slapMode), { "gate", "open" }, true)
 {
     setLookAndFeel (&laf);
     auto& st = proc.apvts;
@@ -38,6 +39,7 @@ SlapdashEditor::SlapdashEditor (SlapdashProcessor& p)
 
     volt.attach (st, pid::volt);
     addAndMakeVisible (volt);
+    addAndMakeVisible (slapMode);
 
     // ---- Master ----
     input.attach     (st, pid::input);
@@ -106,7 +108,7 @@ void SlapdashEditor::timerCallback()
     if (on != shownOn)
     {
         shownOn = on;
-        for (juce::Component* c : std::initializer_list<juce::Component*> { &strip, &addButton, &volt })
+        for (juce::Component* c : std::initializer_list<juce::Component*> { &strip, &addButton, &volt, &slapMode })
             c->setAlpha (on ? 1.0f : 0.45f);
         for (auto* p : panels) p->setAlpha (on ? 1.0f : 0.45f);
     }
@@ -269,7 +271,8 @@ void SlapdashEditor::resized()
     addButton.setBounds (right + panelGap, modY, addW, modH);
 
     const int vx = W - pad - voltW;
-    volt.setBounds (vx + 46, modY + 54, 44, modH - 72);
+    volt.setBounds (vx + 46, modY + 54, 44, modH - 112);
+    slapMode.setBounds (vx + 8, modY + modH - 44, voltW - 16, 30);
 
     // Master strip: label, six knobs, the two switches.
     const int slot = 72, kh = SketchKnob::heightFor (42);

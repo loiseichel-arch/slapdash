@@ -2,30 +2,30 @@
 // The distortion of one band, sample by sample. Plain C++ (no JUCE), so it
 // can be tested on its own. Runs at the oversampled rate.
 //
-// Each type is a small "circuit": what is filtered before the clipper and
-// after it matters as much as the clipper itself.
-//   Tube     : mids pushed in, asymmetry that grows when you dig in (even
-//              harmonics), soft top. Warm, fat, thickens on the attack.
-//   Tape     : highs boosted before and cut after (they saturate first),
-//              soft hysteresis, head bump around 90 Hz. Round, compressed.
-//   Fuzz     : huge gain, hard asymmetric clip, scooped mids, closes on
-//              weak notes. Buzzy and square.
-//   Screamer : only the mids reach the diodes, the bass stays clean
-//              (Tube Screamer style). Tight and mid-forward.
+// Types (v0.3)
+//   Transistor : neutral. Symmetric clip, no filter at all.
+//   Tube       : a little more mids into the clipper, asymmetry that grows
+//                when you dig in (even harmonics), softer top.
+//   Tape       : highs pushed before and pulled back after (they saturate
+//                first), soft hysteresis, small head bump.
+//   Fuzz       : extra gain, hard asymmetric clip, slightly scooped mids.
 //
-// Drive -> More (2nd stage with the same clipper) -> + Grit layer
-//       -> built-in level compensation -> DC blocker -> battery gate
+// The colour filters of Tube, Tape and Fuzz grow with the drive: with
+// little drive the band stays open (flat to 15 kHz), the colour comes as
+// you push it. Transistor never filters.
 //
-// Sag      : a power supply that empties on hard attacks and refills
-//            slowly: the clipping point drops, the note squashes then
-//            "blooms" back.
-// Grit     : up to 50 % a raspy layer of upper harmonics; above, an
-//            octave-up fuzz (rectifier, Octavia style) joins in.
-// Battery  : the Slapdash fader (9 V fresh -> 0 V dead): shifted bias,
-//            more gain into a starved stage, less level, and a gate that
-//            sputters and chokes the note tails.
-// Level compensation: measured per type (CompTable.h), so at -18 dBFS
-// Drive and More change the colour, not the volume.
+// Drive: one stage, 0..+40 dB. The More switch extends the course by
+// another +40 dB: Drive at 100 % without More = Drive at 0 % with More.
+//
+// Sag     : a power supply that empties on hard attacks and refills
+//           slowly: the clipping point drops, the note squashes then
+//           "blooms" back.
+// Battery : the Slapdash fader (9 V fresh -> 0 V dead): shifted bias, more
+//           gain into a starved stage, less level. In "gate" mode it also
+//           sputters and chokes the note tails; in "open" mode it keeps the
+//           colour without the gate.
+// Level compensation: measured per type (CompTable.h), so at -18 dBFS the
+// drive changes the colour, not the volume.
 
 #pragma once
 
@@ -40,7 +40,7 @@ namespace slap
 
 constexpr float kPi = 3.14159265f;
 
-enum class Type : int { Tube = 0, Tape, Fuzz, Screamer };
+enum class Type : int { Transistor = 0, Tube, Tape, Fuzz };
 
 // ---- Biquad: coefficients shared, state per channel ----
 struct Biquad
@@ -79,39 +79,38 @@ struct Biquad
         const float w = 2 * kPi * f / fs, al = std::sin (w) / (2 * q), c = std::cos (w);
         set ((1 - c) / 2, 1 - c, (1 - c) / 2, 1 + al, -2 * c, 1 - al);
     }
-    void highPass (float fs, float f, float q)
-    {
-        const float w = 2 * kPi * f / fs, al = std::sin (w) / (2 * q), c = std::cos (w);
-        set ((1 + c) / 2, -(1 + c), (1 + c) / 2, 1 + al, -2 * c, 1 - al);
-    }
 };
 
 struct BandSettings
 {
-    Type  type   = Type::Tube;
-    float drive  = 0.3f;   // 0..1
-    float more   = 0.0f;   // 0..1
-    float sag    = 0.0f;   // 0..1
-    float grit   = 0.0f;   // 0..1
-    float starve = 0.0f;   // 0 = fresh battery (9 V), 1 = dead (0 V)
+    Type  type   = Type::Transistor;
+    float drive  = 0.3f;    // 0..1
+    bool  more   = false;   // extends the drive by another full course
+    float sag    = 0.0f;    // 0..1
+    float starve = 0.0f;    // 0 = fresh battery (9 V), 1 = dead (0 V)
+    bool  batteryGate = true;   // Slapdash fader: gate (true) or open (false)
 };
 
-inline float driveGain (float drive) { return std::pow (10.0f, (40.0f * drive) / 20.0f); }   // 0..+40 dB
-inline float moreGain  (float more)  { return std::pow (10.0f, (30.0f * more)  / 20.0f); }   // 0..+30 dB
+// Total drive course, 0..2 (2 = Drive 100 % with More).
+inline float driveCourse (float drive, bool more) { return std::clamp (drive, 0.0f, 1.0f) + (more ? 1.0f : 0.0f); }
+inline float driveGainDb (float course) { return 40.0f * course; }   // 0..+80 dB
 
-// The clipper of each type (used by both stages).
-inline float clipTube (float w)      { return w > 0 ? std::tanh (w) : std::tanh (1.6f * w) / 1.6f; }
-inline float clipTape (float w)      { return std::tanh (w); }
+// Extra gain built into a type (dB).
+inline float typeGainDb (Type t) { return t == Type::Fuzz ? 15.6f : 0.0f; }
+
+// The clipper of each type.
+inline float clipTransistor (float w)
+{
+    const float a = std::abs (w);
+    return w / std::cbrt (1.0f + a * a * a);                              // symmetric, firm knee
+}
+inline float clipTube (float w) { return w > 0 ? std::tanh (w) : std::tanh (1.6f * w) / 1.6f; }
+inline float clipTape (float w) { return std::tanh (w); }
 inline float clipFuzz (float w)
 {
     const float w2 = w * w, w4 = w2 * w2, w8 = w4 * w4;
     const float c = w / std::sqrt (std::sqrt (std::sqrt (1.0f + w8)));   // hard knee
     return c > 0 ? c * 0.6f : c;                                          // asymmetric
-}
-inline float clipScreamer (float w)
-{
-    const float w2 = w * w;
-    return w / std::sqrt (std::sqrt (1.0f + w2 * w2));                    // soft diode pair
 }
 
 // One band, up to two channels.
@@ -126,13 +125,10 @@ public:
         auto coef = [this] (float ms) { return std::exp (-1.0f / (0.001f * ms * fs)); };
         envFast = coef (3.0f);   envRel  = coef (60.0f);
         sagDown = coef (4.0f);   sagUp   = coef (280.0f);
-        fuzzAtt = coef (1.0f);   fuzzRel = coef (30.0f);
         batAtt  = coef (1.5f);   batRel  = coef (45.0f);
         batSm   = coef (0.6f);
         dcR     = 1.0f - 2.0f * kPi * 8.0f / fs;
-        gritHp1.highPass (fs, 1500, 0.7f); gritHp2.highPass (fs, 2200, 0.7f);
-        octHp.highPass (fs, 60, 0.7f);
-        currentType = -1;
+        currentType = -1; currentAmt = -1.0f;
         reset();
     }
 
@@ -146,39 +142,23 @@ public:
     void setSettings (const BandSettings& s)
     {
         set = s;
-        g1 = driveGain (s.drive);
-        useMore = s.more > 0.001f;
-        g2 = moreGain (s.more);
-        comp = comp::lookup ((int) s.type, s.drive, s.more);
+        const float course = driveCourse (s.drive, s.more);
+        g = std::pow (10.0f, (driveGainDb (course) + typeGainDb (s.type)) / 20.0f);
+        comp = comp::lookup ((int) s.type, course);
 
-        if ((int) s.type != currentType)
+        // How much colour: grows with the drive, full from about +36 dB.
+        const float amt = std::clamp (driveGainDb (course) / 36.0f, 0.0f, 1.0f);
+        if ((int) s.type != currentType || std::abs (amt - currentAmt) > 0.005f)
         {
-            currentType = (int) s.type;
-            for (auto* f : { &pre1, &pre2, &post1, &post2, &post3, &hpTs }) f->bypass();
-            switch (s.type)
-            {
-                case Type::Tube:
-                    pre1.peak (fs, 700, 0.7f, 4); pre2.highPass (fs, 40, 0.7f);
-                    post1.lowPass (fs, 7500, 0.7f); post2.peak (fs, 130, 0.8f, 1.5f);
-                    break;
-                case Type::Tape:
-                    pre1.highShelf (fs, 2500, 10); pre2.highPass (fs, 25, 0.7f);
-                    post1.highShelf (fs, 2500, -10); post2.peak (fs, 90, 1.0f, 3.5f);
-                    post3.lowPass (fs, 13000, 0.7f);
-                    break;
-                case Type::Fuzz:
-                    pre1.highPass (fs, 90, 0.7f); pre2.peak (fs, 1200, 0.7f, 3);
-                    post1.peak (fs, 900, 0.6f, -6); post2.lowPass (fs, 5200, 0.7f);
-                    break;
-                case Type::Screamer:
-                default:
-                    hpTs.highPass (fs, 720, 0.6f);
-                    post1.lowPass (fs, 3300, 0.7f); post2.peak (fs, 800, 0.9f, 3);
-                    break;
-            }
-            for (auto& c : ch) c.filters = {};   // no blast from old filter states
+            const bool typeChanged = (int) s.type != currentType;
+            currentType = (int) s.type; currentAmt = amt;
+            setFilters (s.type, amt);
+            if (typeChanged) for (auto& c : ch) c.filters = {};   // no blast from old filter states
         }
     }
+
+    // Without compensation (used to measure CompTable.h).
+    void setCompensation (float c) { comp = c; }
 
     // The sputter of a dying battery: random chops shared by both channels.
     // Call once per sample, before process().
@@ -191,9 +171,6 @@ public:
         }
     }
 
-    // Without compensation (used to measure CompTable.h).
-    void setCompensation (float c) { comp = c; }
-
     // x = band-filtered input. Returns the saturated band (before Mix).
     float process (int c, float x)
     {
@@ -202,7 +179,7 @@ public:
         const float s = set.starve;
 
         // ---- Sag: the supply empties on hard attacks and refills slowly ----
-        const float demand = std::min (4.0f, std::abs (x) * g1);
+        const float demand = std::min (4.0f, std::abs (x) * g);
         st.env = demand > st.env ? envFast * st.env + (1 - envFast) * demand : envRel * st.env + (1 - envRel) * demand;
         const float vTarget = 1.0f / (1.0f + set.sag * 6.0f * st.env);
         st.v = vTarget < st.v ? sagDown * st.v + (1 - sagDown) * vTarget : sagUp * st.v + (1 - sagUp) * vTarget;
@@ -210,67 +187,43 @@ public:
         const float sagBias = 0.25f * set.sag * (1 - v);
 
         // ---- Battery: more gain into a starved, biased stage ----
-        const float batGain = 1.0f + 2.0f * s;
+        const float gb = g * (1.0f + 2.0f * s);
         const float batBias = 0.45f * s;
-        const float g = g1 * batGain;
 
         float y = 0.0f;
         switch (set.type)
         {
+            case Type::Transistor:
+            default:
+            {
+                const float b = sagBias + batBias;
+                y = (clipTransistor (x * gb / v + b) - clipTransistor (b)) * v;
+                break;
+            }
             case Type::Tube:
             {
-                const float u = pre2.process (pre1.process (x, fl[0]), fl[1]) * g;
+                const float u = pre1.process (x, fl[0]) * gb;
                 const float b = 0.12f + 0.4f * std::min (1.0f, st.env * 0.5f) + sagBias + batBias;
-                float c1 = (clipTube (u / v + b) - std::tanh (b)) * v;
-                if (useMore) c1 = clipTube (c1 * g2);
+                const float c1 = (clipTube (u / v + b) - std::tanh (b)) * v;
                 y = post2.process (post1.process (c1, fl[2]), fl[3]);
                 break;
             }
             case Type::Tape:
             {
-                const float u = pre2.process (pre1.process (x, fl[0]), fl[1]) * (0.35f + 0.65f * g * 0.25f);
+                const float u = pre1.process (x, fl[0]) * (0.35f + 0.65f * gb * 0.25f);
                 float h = clipTape (u / v + sagBias + batBias + 0.35f * st.hyst);
                 st.hyst = h;
                 h *= v;
-                if (useMore) h = clipTape (h * g2);
                 y = post3.process (post2.process (post1.process (h, fl[2]), fl[3]), fl[4]);
                 break;
             }
             case Type::Fuzz:
             {
-                const float u = pre2.process (pre1.process (x, fl[0]), fl[1]) * g * 6.0f;
-                float c1 = clipFuzz (u / v + 0.3f + sagBias + batBias) * v;
-                if (useMore) c1 = clipFuzz (c1 * g2);
+                const float u = pre1.process (x, fl[0]) * gb;
+                const float c1 = clipFuzz (u / v + 0.3f + sagBias + batBias) * v;
                 y = post2.process (post1.process (c1, fl[2]), fl[3]);
-
-                // Closes on weak notes.
-                const float a = std::abs (x);
-                st.fuzzGate = a > st.fuzzGate ? fuzzAtt * st.fuzzGate + (1 - fuzzAtt) * a
-                                              : fuzzRel * st.fuzzGate + (1 - fuzzRel) * a;
-                const float t = std::clamp ((st.fuzzGate - 0.004f) / 0.02f, 0.0f, 1.0f);
-                y *= t * t * (3 - 2 * t);
                 break;
             }
-            case Type::Screamer:
-            default:
-            {
-                const float d = hpTs.process (x, fl[5]) * g * 2.0f;
-                float c1 = clipScreamer (d / v + sagBias + batBias) * v;
-                if (useMore) c1 = clipScreamer (c1 * g2);
-                y = post2.process (post1.process (0.6f * x + 0.7f * c1, fl[2]), fl[3]);
-                break;
-            }
-        }
-
-        // ---- Grit ----
-        if (set.grit > 0.0f)
-        {
-            const float rasp = std::clamp (gritHp1.process (x, st.grit[0]) * g1 * 25.0f, -1.0f, 1.0f);
-            const float raspOut = gritHp2.process (rasp, st.grit[1]);
-            const float oct = std::clamp (octHp.process (std::abs (x) * g1 * 3.0f, st.grit[2]) * 4.0f, -1.0f, 1.0f);
-            const float aRasp = std::min (1.0f, set.grit * 2.0f) * 0.55f;
-            const float aOct  = std::max (0.0f, set.grit * 2.0f - 1.0f) * 0.7f;
-            y += aRasp * raspOut + aOct * oct;
         }
 
         y *= comp;
@@ -281,8 +234,8 @@ public:
         st.dcX = y; st.dcY = dc;
         y = dc;
 
-        // ---- Battery gate: chokes and sputters on the tails ----
-        if (s > 0.02f)
+        // ---- Battery gate (gate mode only): chokes and sputters on the tails ----
+        if (set.batteryGate && s > 0.02f)
         {
             const float a = std::abs (x);
             st.batEnv = a > st.batEnv ? batAtt * st.batEnv + (1 - batAtt) * a : batRel * st.batEnv + (1 - batRel) * a;
@@ -300,11 +253,39 @@ public:
     }
 
 private:
+    // Colour filters, scaled by amt (0 = open, 1 = full colour). Gentler than v0.2.
+    void setFilters (Type t, float amt)
+    {
+        for (auto* f : { &pre1, &post1, &post2, &post3 }) f->bypass();
+        auto lp = [&] (float full) { return 30000.0f * std::pow (full / 30000.0f, amt); };   // 30 kHz -> full
+        switch (t)
+        {
+            case Type::Tube:
+                pre1.peak (fs, 700, 0.7f, 2.0f * amt);
+                post1.lowPass (fs, lp (11000.0f), 0.7f);
+                post2.peak (fs, 130, 0.8f, 1.0f * amt);
+                break;
+            case Type::Tape:
+                pre1.highShelf (fs, 2500, 8.0f);    // emphasis / de-emphasis cancel when clean
+                post1.highShelf (fs, 2500, -8.0f);
+                post2.peak (fs, 90, 1.0f, 2.0f * amt);
+                post3.lowPass (fs, lp (16000.0f), 0.7f);
+                break;
+            case Type::Fuzz:
+                pre1.peak (fs, 1200, 0.7f, 2.0f * amt);
+                post1.peak (fs, 900, 0.6f, -3.0f * amt);
+                post2.lowPass (fs, lp (8000.0f), 0.7f);
+                break;
+            case Type::Transistor:
+            default:
+                break;   // no filter
+        }
+    }
+
     struct Channel
     {
         std::array<Biquad::State, 6> filters {};
-        std::array<Biquad::State, 3> grit {};
-        float env = 0, v = 1, hyst = 0, fuzzGate = 0, dcX = 0, dcY = 0, batEnv = 0, batGate = 1;
+        float env = 0, v = 1, hyst = 0, dcX = 0, dcY = 0, batEnv = 0, batGate = 1;
         uint32_t rnd = 0x1234567u;
     };
 
@@ -321,12 +302,12 @@ private:
 
     BandSettings set;
     Channel ch[maxCh];
-    Biquad pre1, pre2, post1, post2, post3, hpTs, gritHp1, gritHp2, octHp;
+    Biquad pre1, post1, post2, post3;
     int currentType = -1;
+    float currentAmt = -1.0f;
     float fs = 192000.0f;
-    float g1 = 1.0f, g2 = 1.0f, comp = 1.0f;
-    bool useMore = false;
-    float envFast = 0, envRel = 0, sagDown = 0, sagUp = 0, fuzzAtt = 0, fuzzRel = 0;
+    float g = 1.0f, comp = 1.0f;
+    float envFast = 0, envRel = 0, sagDown = 0, sagUp = 0;
     float batAtt = 0, batRel = 0, batSm = 0, dcR = 0.9999f;
     uint32_t seed = 0x9E3779B9u;
     int chopLeft = 0;

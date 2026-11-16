@@ -1,5 +1,5 @@
 // BandPanel.h
-// One distortion module: Type, Drive / More / Sag / Grit / Mix, and on the
+// One distortion module: Type, Drive / Sag / Mix, the More switch, and on the
 // right Pan and the band Gain fader (linked to the gain line of the strip).
 
 #pragma once
@@ -16,9 +16,9 @@ public:
     {
         using namespace params;
         drive.attach (state, bandId (index, band::drive));
-        more.attach  (state, bandId (index, band::more));
         sag.attach   (state, bandId (index, band::sag));
-        grit.attach  (state, bandId (index, band::grit));
+        more.attach  (state, bandId (index, band::more));
+        more.setTooltip ("more: another full course of drive (alt-click to reset)");
         mix.attach   (state, bandId (index, band::mix));
         pan.attach   (state, bandId (index, band::pan));
         gain.attach  (state, bandId (index, band::gain));
@@ -27,7 +27,7 @@ public:
         bypass.attach (state, bandId (index, band::bypass));
 
         for (juce::Component* c : std::initializer_list<juce::Component*> {
-                 &types, &drive, &more, &sag, &grit, &mix, &pan, &gain })
+                 &types, &drive, &sag, &mix, &more, &pan, &gain })
             addAndMakeVisible (c);
         for (juce::Component* c : std::initializer_list<juce::Component*> { &solo, &mute, &bypass, &removeButton })
             addChildComponent (c);
@@ -94,19 +94,16 @@ public:
 
         types.setBounds (12, 48, getWidth() - 24, 28);
 
-        // Knob grid: 3 + 2, centred in the space left of the right column.
+        // Drive, Sag, Mix in a row, the More switch under Drive.
         const int colW = 70, rowH = SketchKnob::heightFor (54) + 4;
         const int gridW = colW * 3;
         const int leftW = rightColumn().getX() - 8 - 12;
         const int gx = 12 + juce::jmax (0, (leftW - gridW) / 2);
-        const int gy = 92;
-        SketchKnob* knobs[] = { &drive, &more, &sag, &grit, &mix };
-        for (int i = 0; i < 5; ++i)
-        {
-            const int row = i / 3, col = i % 3;
-            const int offset = row == 1 ? colW / 2 : 0;   // second row centred under the first
-            knobs[i]->setBounds (gx + offset + col * colW, gy + row * rowH, colW, rowH);
-        }
+        const int gy = 100;
+        SketchKnob* knobs[] = { &drive, &sag, &mix };
+        for (int i = 0; i < 3; ++i)
+            knobs[i]->setBounds (gx + i * colW, gy, colW, rowH);
+        more.setBounds (juce::jmax (12, gx + colW / 2 - 48), gy + rowH + 14, 96, 34);   // under Drive
 
         const auto rc = rightColumn();
         pan.setBounds (rc.getX(), 90, rc.getWidth(), SketchKnob::heightFor (40));
@@ -128,7 +125,8 @@ private:
 
     int index;
     ChoiceSelector types;
-    SketchKnob drive { "Drive", 54 }, more { "More", 54 }, sag { "Sag", 54 }, grit { "Grit", 54 }, mix { "Mix", 54 };
+    SketchKnob drive { "Drive", 54 }, sag { "Sag", 54 }, mix { "Mix", 54 };
+    PillToggle more { "More", false };
     SketchKnob pan { "Pan", 40 };
     SketchFader gain { "band gain" };
     CircleToggle solo { "S", "solo" }, mute { "M", "mute" }, bypass { "B", "bypass" };
