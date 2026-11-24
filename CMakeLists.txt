@@ -6,7 +6,7 @@ cmake_minimum_required (VERSION 3.22)
 set (CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
 set (CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 
-project (Slapdash VERSION 0.3.0 LANGUAGES C CXX)
+project (Slapdash VERSION 0.4.0 LANGUAGES C CXX)
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -82,3 +82,22 @@ target_link_libraries (Slapdash
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+if (UNIX AND NOT APPLE)
+    # Linux test builds: no audio device code needed for a plug-in.
+    target_compile_definitions (Slapdash PUBLIC JUCE_ALSA=0 JUCE_JACK=0)
+endif()
+
+# Linux only: runs the processor offline (battery, presets) and saves
+# pictures of the window: tools/ui_snapshot.cpp
+option (SLAPDASH_TESTS "Build the offline test" OFF)
+if (SLAPDASH_TESTS AND UNIX AND NOT APPLE)
+    juce_add_console_app (ui_snapshot PRODUCT_NAME "ui_snapshot")
+    target_sources (ui_snapshot PRIVATE tools/ui_snapshot.cpp Source/PluginProcessor.cpp
+                    Source/PluginEditor.cpp Source/ui/SketchLookAndFeel.cpp)
+    target_include_directories (ui_snapshot PRIVATE Source)
+    target_compile_definitions (ui_snapshot PRIVATE JucePlugin_Name="Slapdash" JucePlugin_VersionString="${PROJECT_VERSION}"
+                                JUCE_ALSA=0 JUCE_JACK=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 SLAPDASH_HAS_FONTS=1)
+    target_link_libraries (ui_snapshot PRIVATE SlapdashAssets juce::juce_audio_utils juce::juce_dsp
+                           juce::juce_recommended_config_flags)
+endif()

@@ -5,6 +5,7 @@
 #include "ui/Components.h"
 #include "ui/BandStrip.h"
 #include "ui/BandPanel.h"
+#include "ui/PresetBar.h"
 
 class SlapdashEditor : public juce::AudioProcessorEditor,
                        private juce::Timer
@@ -28,8 +29,9 @@ private:
     void resetBand (int index);
     void enterLayer();
 
-    static constexpr int H = 680, pad = 28, panelGap = 16, addW = 64, voltW = 104;
-    static constexpr int headerY = 18, stripY = 86, stripH = 118, modY = 218, modH = 330, masterY = 562, masterH = 100;
+    static constexpr int H = 716, pad = 28, panelGap = 16, addW = 64, voltW = 104;
+    // header: logo, on / Link / Split-Layer, then the presets row under them (since 0.4)
+    static constexpr int headerY = 18, presetY = 76, stripY = 122, stripH = 118, modY = 254, modH = 330, masterY = 598, masterH = 100;
 
     SlapdashProcessor& proc;
     SketchLookAndFeel laf;
@@ -37,6 +39,7 @@ private:
     juce::TooltipWindow tooltips { this, 600 };
 
     ResetToggle onSwitch { "on", true };
+    PresetBar presetBar;
     PillToggle linkButton { "Link", false };
     ChoiceSelector modeSelector;
     BandStrip strip;

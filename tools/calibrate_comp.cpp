@@ -38,7 +38,6 @@ int main (int argc, char** argv)
             double in = 0, out = 0;
             for (int n = 0; n < N; ++n)
             {
-                s.tick();
                 const float y = s.process (0, sig[(size_t) n]);
                 if (n > N / 4) { in += (double) sig[(size_t) n] * sig[(size_t) n]; out += (double) y * y; }
             }

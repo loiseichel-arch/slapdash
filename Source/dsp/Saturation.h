@@ -20,10 +20,10 @@
 // Sag     : a power supply that empties on hard attacks and refills
 //           slowly: the clipping point drops, the note squashes then
 //           "blooms" back.
-// Battery : the Slapdash fader (9 V fresh -> 0 V dead): shifted bias, more
-//           gain into a starved stage, less level. In "gate" mode it also
-//           sputters and chokes the note tails; in "open" mode it keeps the
-//           colour without the gate.
+// Battery : the Slapdash fader (9 V fresh -> 0 V dead). Since v0.4 it is not
+//           in the bands any more: one BatteryStage on the master, after the
+//           sum of the modules (see the end of this file), so the band Mix
+//           knobs do not change it; only the master Mix doses it.
 // Level compensation: measured per type (CompTable.h), so at -18 dBFS the
 // drive changes the colour, not the volume.
 
@@ -87,8 +87,6 @@ struct BandSettings
     float drive  = 0.3f;    // 0..1
     bool  more   = false;   // extends the drive by another full course
     float sag    = 0.0f;    // 0..1
-    float starve = 0.0f;    // 0 = fresh battery (9 V), 1 = dead (0 V)
-    bool  batteryGate = true;   // Slapdash fader: gate (true) or open (false)
 };
 
 // Total drive course, 0..2 (2 = Drive 100 % with More).
@@ -125,8 +123,6 @@ public:
         auto coef = [this] (float ms) { return std::exp (-1.0f / (0.001f * ms * fs)); };
         envFast = coef (3.0f);   envRel  = coef (60.0f);
         sagDown = coef (4.0f);   sagUp   = coef (280.0f);
-        batAtt  = coef (1.5f);   batRel  = coef (45.0f);
-        batSm   = coef (0.6f);
         dcR     = 1.0f - 2.0f * kPi * 8.0f / fs;
         currentType = -1; currentAmt = -1.0f;
         reset();
@@ -135,7 +131,6 @@ public:
     void reset()
     {
         for (auto& c : ch) c = {};
-        chopLeft = 0; chopOn = true;
     }
 
     // Call once per block.
@@ -160,23 +155,11 @@ public:
     // Without compensation (used to measure CompTable.h).
     void setCompensation (float c) { comp = c; }
 
-    // The sputter of a dying battery: random chops shared by both channels.
-    // Call once per sample, before process().
-    void tick()
-    {
-        if (--chopLeft <= 0)
-        {
-            chopOn = nextRandom() < 0.55f;
-            chopLeft = 1 + (int) ((0.6f + 4.0f * nextRandom()) * 0.001f * fs);
-        }
-    }
-
     // x = band-filtered input. Returns the saturated band (before Mix).
     float process (int c, float x)
     {
         auto& st = ch[c];
         auto& fl = st.filters;
-        const float s = set.starve;
 
         // ---- Sag: the supply empties on hard attacks and refills slowly ----
         const float demand = std::min (4.0f, std::abs (x) * g);
@@ -186,9 +169,7 @@ public:
         const float v = st.v;
         const float sagBias = 0.25f * set.sag * (1 - v);
 
-        // ---- Battery: more gain into a starved, biased stage ----
-        const float gb = g * (1.0f + 2.0f * s);
-        const float batBias = 0.45f * s;
+        const float gb = g;
 
         float y = 0.0f;
         switch (set.type)
@@ -196,14 +177,14 @@ public:
             case Type::Transistor:
             default:
             {
-                const float b = sagBias + batBias;
+                const float b = sagBias;
                 y = (clipTransistor (x * gb / v + b) - clipTransistor (b)) * v;
                 break;
             }
             case Type::Tube:
             {
                 const float u = pre1.process (x, fl[0]) * gb;
-                const float b = 0.12f + 0.4f * std::min (1.0f, st.env * 0.5f) + sagBias + batBias;
+                const float b = 0.12f + 0.4f * std::min (1.0f, st.env * 0.5f) + sagBias;
                 const float c1 = (clipTube (u / v + b) - std::tanh (b)) * v;
                 y = post2.process (post1.process (c1, fl[2]), fl[3]);
                 break;
@@ -211,7 +192,7 @@ public:
             case Type::Tape:
             {
                 const float u = pre1.process (x, fl[0]) * (0.35f + 0.65f * gb * 0.25f);
-                float h = clipTape (u / v + sagBias + batBias + 0.35f * st.hyst);
+                float h = clipTape (u / v + sagBias + 0.35f * st.hyst);
                 st.hyst = h;
                 h *= v;
                 y = post3.process (post2.process (post1.process (h, fl[2]), fl[3]), fl[4]);
@@ -220,36 +201,18 @@ public:
             case Type::Fuzz:
             {
                 const float u = pre1.process (x, fl[0]) * gb;
-                const float c1 = clipFuzz (u / v + 0.3f + sagBias + batBias) * v;
+                const float c1 = clipFuzz (u / v + 0.3f + sagBias) * v;
                 y = post2.process (post1.process (c1, fl[2]), fl[3]);
                 break;
             }
         }
 
         y *= comp;
-        y *= 1.0f - 0.55f * s;   // a dying battery loses level (Auto gain can bring it back)
 
         // ---- DC blocker (the biases add DC) ----
         const float dc = y - st.dcX + dcR * st.dcY;
         st.dcX = y; st.dcY = dc;
-        y = dc;
-
-        // ---- Battery gate (gate mode only): chokes and sputters on the tails ----
-        if (set.batteryGate && s > 0.02f)
-        {
-            const float a = std::abs (x);
-            st.batEnv = a > st.batEnv ? batAtt * st.batEnv + (1 - batAtt) * a : batRel * st.batEnv + (1 - batRel) * a;
-            const float thr = 0.001f + 0.08f * s * s;
-            float target;
-            if (st.batEnv < thr)             target = 0.0f;
-            else if (st.batEnv < thr * 2.0f) target = chopOn ? 1.0f : 0.0f;   // sputter zone
-            else                             target = (s > 0.6f && ! chopOn && nextRandomCheap (st) < (s - 0.6f) * 0.5f) ? 0.3f : 1.0f;
-            st.batGate = batSm * st.batGate + (1 - batSm) * target;
-            y *= st.batGate;
-        }
-        else st.batGate = 1.0f;
-
-        return y;
+        return dc;
     }
 
 private:
@@ -285,9 +248,109 @@ private:
     struct Channel
     {
         std::array<Biquad::State, 6> filters {};
-        float env = 0, v = 1, hyst = 0, dcX = 0, dcY = 0, batEnv = 0, batGate = 1;
-        uint32_t rnd = 0x1234567u;
+        float env = 0, v = 1, hyst = 0, dcX = 0, dcY = 0;
     };
+
+    BandSettings set;
+    Channel ch[maxCh];
+    Biquad pre1, post1, post2, post3;
+    int currentType = -1;
+    float currentAmt = -1.0f;
+    float fs = 192000.0f;
+    float g = 1.0f, comp = 1.0f;
+    float envFast = 0, envRel = 0, sagDown = 0, sagUp = 0;
+    float dcR = 0.9999f;
+};
+
+// ---------------------------------------------------------------------------
+// The Slapdash fader: one battery for the whole plug, on the master, after
+// the sum of the modules (oversampled). A simple transistor stage fed by a
+// dying battery: as the voltage drops, the supply gets lower (the stage
+// clips earlier), the bias shifts (asymmetry, even harmonics), there is a
+// little more gain into it and less level out. In "gate" mode it also
+// sputters and chokes the note tails; in "open" mode, the colour without
+// the gate. At 9 V the stage is out of the way (exact pass-through); it
+// comes in gradually over the first volt.
+class BatteryStage
+{
+public:
+    static constexpr int maxCh = 2;
+
+    void prepare (double sampleRate)
+    {
+        fs = (float) sampleRate;
+        auto coef = [this] (float ms) { return std::exp (-1.0f / (0.001f * ms * fs)); };
+        batAtt = coef (1.5f);  batRel = coef (45.0f);
+        batSm  = coef (0.6f);
+        dcR    = 1.0f - 2.0f * kPi * 8.0f / fs;
+        reset();
+    }
+
+    void reset()
+    {
+        for (auto& c : ch) c = {};
+        chopLeft = 0; chopOn = true;
+    }
+
+    // starve: 0 = fresh (9 V) .. 1 = dead (0 V). Call once per block.
+    void set (float starveAmount, bool gateMode)
+    {
+        s = std::clamp (starveAmount, 0.0f, 1.0f);
+        gate = gateMode;
+    }
+
+    bool active() const { return s > 0.0f; }
+
+    // Random chops of the sputter, shared by both channels. Once per sample.
+    void tick()
+    {
+        if (--chopLeft <= 0)
+        {
+            chopOn = nextRandom() < 0.55f;
+            chopLeft = 1 + (int) ((0.6f + 4.0f * nextRandom()) * 0.001f * fs);
+        }
+    }
+
+    float process (int c, float x)
+    {
+        auto& st = ch[c];
+        if (s <= 0.0f) { st = {}; return x; }
+
+        // starved transistor stage
+        const float head = 1.0f + 3.0f * s;          // the supply drops: clips earlier
+        const float gain = 1.0f + 1.0f * s;          // a little more gain into it
+        const float b = 0.45f * s;                   // shifted bias
+        float y = (clipTransistor (x * gain * head + b) - clipTransistor (b)) / head;
+        y *= 1.0f - 0.55f * s;                       // a dying battery loses level (Auto gain can bring it back)
+
+        // DC blocker (the bias adds DC)
+        const float dc = y - st.dcX + dcR * st.dcY;
+        st.dcX = y; st.dcY = dc;
+        y = dc;
+
+        // comes in over the first volt (9 V -> 8 V)
+        const float w = std::min (1.0f, s * 9.0f);
+        y = x + w * (y - x);
+
+        // gate (gate mode only): chokes and sputters on the tails
+        if (gate && s > 0.02f)
+        {
+            const float a = std::abs (x);
+            st.env = a > st.env ? batAtt * st.env + (1 - batAtt) * a : batRel * st.env + (1 - batRel) * a;
+            const float thr = 0.001f + 0.08f * s * s;
+            float target;
+            if (st.env < thr)             target = 0.0f;
+            else if (st.env < thr * 2.0f) target = chopOn ? 1.0f : 0.0f;   // sputter zone
+            else                          target = (s > 0.6f && ! chopOn && nextRandomCheap (st) < (s - 0.6f) * 0.5f) ? 0.3f : 1.0f;
+            st.gate = batSm * st.gate + (1 - batSm) * target;
+            y *= st.gate;
+        }
+        else st.gate = 1.0f;
+        return y;
+    }
+
+private:
+    struct Channel { float dcX = 0, dcY = 0, env = 0, gate = 1; uint32_t rnd = 0x1234567u; };
 
     float nextRandom()
     {
@@ -300,14 +363,9 @@ private:
         return (float) (c.rnd & 0xFFFF) / 65536.0f;
     }
 
-    BandSettings set;
     Channel ch[maxCh];
-    Biquad pre1, post1, post2, post3;
-    int currentType = -1;
-    float currentAmt = -1.0f;
-    float fs = 192000.0f;
-    float g = 1.0f, comp = 1.0f;
-    float envFast = 0, envRel = 0, sagDown = 0, sagUp = 0;
+    float fs = 192000.0f, s = 0.0f;
+    bool gate = true;
     float batAtt = 0, batRel = 0, batSm = 0, dcR = 0.9999f;
     uint32_t seed = 0x9E3779B9u;
     int chopLeft = 0;

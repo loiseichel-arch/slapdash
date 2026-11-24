@@ -8,6 +8,7 @@
 #include "dsp/Saturation.h"
 #include "Parameters.h"
 #include "LinkManager.h"
+#include "PresetManager.h"
 
 class SlapdashProcessor : public juce::AudioProcessor
 {
@@ -43,6 +44,8 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
     LinkManager link { apvts };
+    // a preset recalls everything but "on"; Link does not copy the values of a preset to the other bands
+    PresetManager presets { apvts, "Slapdash", { params::id::active } };
 
 private:
     static constexpr int B = params::maxBands;
@@ -75,6 +78,8 @@ private:
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampling;
     std::array<juce::dsp::LinkwitzRileyFilter<float>, 3> splits;
     std::array<Band, B> bands;
+    slap::BatteryStage battery;        // the Slapdash fader, on the master (after the sum of the modules)
+    float starveSm = 0.0f;
 
     juce::dsp::StateVariableTPTFilter<float> lowCutFilter, highCutFilter;
     juce::dsp::LinkwitzRileyFilter<float> monoSplit;

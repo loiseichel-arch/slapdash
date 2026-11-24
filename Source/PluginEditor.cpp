@@ -4,7 +4,7 @@ using namespace sketch;
 namespace pid = params::id;
 
 SlapdashEditor::SlapdashEditor (SlapdashProcessor& p)
-    : AudioProcessorEditor (&p), proc (p),
+    : AudioProcessorEditor (&p), proc (p), presetBar (p.presets),
       modeSelector (*p.apvts.getParameter (pid::layer), { "Split", "Layer" }, true),
       strip (p.apvts),
       slapMode (*p.apvts.getParameter (pid::slapMode), { "gate", "open" }, true)
@@ -22,6 +22,7 @@ SlapdashEditor::SlapdashEditor (SlapdashProcessor& p)
     onSwitch.attach (st, pid::active);
     onSwitch.setTooltip ("plugin on / bypass (alt-click to reset)");
     addAndMakeVisible (onSwitch);
+    addAndMakeVisible (presetBar);
     linkButton.attach (st, pid::link);
     linkButton.setTooltip ("move all bands together, keeping their offsets (alt-click to reset)");
     addAndMakeVisible (linkButton);
@@ -260,6 +261,7 @@ void SlapdashEditor::resized()
     modeSelector.setBounds (W - pad - selW, hy, selW, 30);
     linkButton.setBounds (modeSelector.getX() - 14 - 106, hy - 1, 106, 32);
     onSwitch.setBounds (linkButton.getX() - 14 - 80, hy, 80, 30);
+    presetBar.setBounds (W - pad - 440, presetY, 440, 30);   // presets, under them
 
     strip.setBounds (pad, stripY, W - 2 * pad, stripH);
 

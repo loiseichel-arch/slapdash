@@ -9,6 +9,8 @@ SlapdashProcessor::SlapdashProcessor()
                         .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "SlapdashState", params::createLayout())
 {
+    presets.aroundLoad = [this] (const std::function<void()>& load) { LinkManager::Suspend s (link); load(); };
+
     auto get = [this] (const juce::String& p)
     {
         auto* v = apvts.getRawParameterValue (p);
@@ -77,6 +79,9 @@ void SlapdashProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
         b.panR.setCurrentAndTargetValue (1.0f);
         b.audible.setCurrentAndTargetValue (1.0f);
     }
+
+    battery.prepare (osRate);
+    starveSm = 1.0f - juce::jlimit (0.0f, 9.0f, raw.volt->load()) / 9.0f;
 
     lowCutFilter.prepare (spec);  lowCutFilter.setType (juce::dsp::StateVariableTPTFilterType::highpass);
     highCutFilter.prepare (spec); highCutFilter.setType (juce::dsp::StateVariableTPTFilterType::lowpass);
@@ -200,8 +205,6 @@ void SlapdashProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         s.more   = bd.course > 1.0f;
         s.drive  = s.more ? bd.course - 1.0f : bd.course;
         s.sag    = bd.sag;
-        s.starve = starve;
-        s.batteryGate = juce::roundToInt (raw.slapMode->load()) == 0;
         bd.sat.setSettings (s);
 
         bd.mix.setTargetValue (r.mix->load() * 0.01f);
@@ -223,6 +226,11 @@ void SlapdashProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         }
     }
 
+    // ---- The battery (Slapdash fader): one stage on the master ----
+    starveSm += 0.35f * (starve - starveSm);
+    if (std::abs (starve - starveSm) < 1.0e-4f) starveSm = starve;
+    battery.set (starveSm, juce::roundToInt (raw.slapMode->load()) == 0);
+
     // ---- Oversampled band section ----
     auto up = oversampling->processSamplesUp (block);
     const int nOs = (int) up.getNumSamples();
@@ -231,10 +239,10 @@ void SlapdashProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     for (int i = 0; i < nOs; ++i)
     {
         std::array<float, B> mixV {}, gainL {}, gainR {};
+        battery.tick();
         for (int b = 0; b < nb; ++b)
         {
             auto& bd = bands[(size_t) b];
-            bd.sat.tick();
             mixV[(size_t) b] = bd.mix.getNextValue();
             const float g = bd.gain.getNextValue() * bd.audible.getNextValue();
             gainL[(size_t) b] = g * bd.panL.getNextValue();
@@ -284,7 +292,7 @@ void SlapdashProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
                 const float y = dry + mixV[(size_t) b] * (wet - dry);
                 sum += y * (c == 0 ? gainL[(size_t) b] : gainR[(size_t) b]);
             }
-            io[(size_t) c][i] = sum;
+            io[(size_t) c][i] = battery.process (c, sum);   // after the modules: their Mix does not change it
         }
     }
 
