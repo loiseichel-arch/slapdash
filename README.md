@@ -1,4 +1,4 @@
-# Slapdash v0.4.1
+# Slapdash v0.4.2
 
 Saturation multibande de **Planet Gloria** (AAX pour Pro Tools, plus AU, VST3 et une app autonome pour tester), écrite avec JUCE. Même famille visuelle que Malade : interface dessinée à la main.
 
@@ -10,8 +10,8 @@ Saturation multibande de **Planet Gloria** (AAX pour Pro Tools, plus AU, VST3 et
     - **Transistor** : neutre. Écrêtage symétrique, aucun filtre.
     - **Tube** : un peu plus de médiums dans l'écrêtage, asymétrie qui grandit quand on attaque (harmoniques paires), haut adouci.
     - **Tape** : les aigus saturent en premier (accentuation / désaccentuation), hystérésis douce, petite bosse de tête vers 90 Hz.
-    - **Fuzz** : écrêtage dur asymétrique, médiums légèrement creusés.
-    - **Le Drive est calibré pareil sur les 4 types** : à réglage égal, à peu près autant de saturation, pour comparer les types sans retoucher le Drive.
+    - **Fuzz** : gain en plus (+15,6 dB, voulu : une fuzz doit être plus sale), écrêtage dur asymétrique, médiums légèrement creusés.
+    - **Le Drive est calibré pareil sur Transistor, Tube et Tape** : à réglage égal, à peu près autant de saturation. Les 4 types sortent au même volume.
     - La couleur des filtres grandit avec le Drive : peu de Drive = son ouvert (plat à ±1,5 dB jusqu'à 15 kHz à 30 %), la couleur vient quand on pousse. Le Transistor ne filtre jamais.
   - **Drive** (0 à +40 dB) et l'interrupteur **More**, qui prolonge la course : Drive à fond sans More = Drive à zéro avec More (jusqu'à +80 dB).
   - **Sag** : une alimentation qui se vide sur les attaques fortes (4 ms) et se recharge lentement (280 ms) : le point d'écrêtage baisse, l'attaque s'écrase, puis la note « respire ».
@@ -32,6 +32,11 @@ Saturation multibande de **Planet Gloria** (AAX pour Pro Tools, plus AU, VST3 et
 - Suréchantillonnage ×4 de toute la partie disto, pour éviter le repliement (aliasing).
 
 Réglages à l'ouverture : 1 module pleine bande, Split, on, Link OFF, Auto gain ON, Speaker sim OFF, Mono maker Off, Slapdash 9 V.
+
+## Nouveau en v0.4.2
+
+- **Fuzz** retrouve son gain de la v0.4.0 (+15,6 dB) : plus sale que les autres, sinon elle faisait double emploi avec Transistor.
+- **Tape** sort 3,5 dB moins fort (réglé à l'oreille), pour avoir le même volume que les autres types.
 
 ## Nouveau en v0.4.1
 

@@ -8,7 +8,7 @@
 //                when you dig in (even harmonics), softer top.
 //   Tape       : highs pushed before and pulled back after (they saturate
 //                first), soft hysteresis, small head bump.
-//   Fuzz       : hard asymmetric clip, slightly scooped mids.
+//   Fuzz       : extra gain, hard asymmetric clip, slightly scooped mids.
 //
 // The colour filters of Tube, Tape and Fuzz grow with the drive: with
 // little drive the band stays open (flat to 15 kHz), the colour comes as
@@ -93,18 +93,23 @@ struct BandSettings
 inline float driveCourse (float drive, bool more) { return std::clamp (drive, 0.0f, 1.0f) + (more ? 1.0f : 0.0f); }
 inline float driveGainDb (float course) { return 40.0f * course; }   // 0..+80 dB
 
-// Gain offset of each type (dB), so the same Drive gives about the same amount
-// of saturation on every type (v0.5: measured by the compression of a drum-like
-// signal and checked by ear against Transistor and Tube).
+// Gain offset of each type (dB). Transistor, Tube and Tape: the same Drive
+// gives about the same amount of saturation (v0.4.1, measured by the
+// compression of a drum-like signal, checked by ear). Fuzz keeps its extra
+// gain on purpose: a fuzz is meant to be dirtier (v0.4.2).
 inline float typeGainDb (Type t)
 {
     switch (t)
     {
         case Type::Tape: return -3.0f;
-        case Type::Fuzz: return -4.0f;
+        case Type::Fuzz: return 15.6f;
         default:         return 0.0f;
     }
 }
+
+// Output trim of each type (dB), on top of the measured compensation
+// (CompTable.h), set by ear so the types sound as loud as each other.
+inline float typeTrimDb (Type t) { return t == Type::Tape ? -3.5f : 0.0f; }
 
 // The clipper of each type.
 inline float clipTransistor (float w)
@@ -149,7 +154,7 @@ public:
         set = s;
         const float course = driveCourse (s.drive, s.more);
         g = std::pow (10.0f, (driveGainDb (course) + typeGainDb (s.type)) / 20.0f);
-        comp = comp::lookup ((int) s.type, course);
+        comp = comp::lookup ((int) s.type, course) * std::pow (10.0f, typeTrimDb (s.type) / 20.0f);
 
         // How much colour: grows with the drive, full from about +36 dB.
         const float amt = std::clamp (driveGainDb (course) / 36.0f, 0.0f, 1.0f);
