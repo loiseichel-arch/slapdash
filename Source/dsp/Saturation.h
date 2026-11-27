@@ -8,7 +8,7 @@
 //                when you dig in (even harmonics), softer top.
 //   Tape       : highs pushed before and pulled back after (they saturate
 //                first), soft hysteresis, small head bump.
-//   Fuzz       : extra gain, hard asymmetric clip, slightly scooped mids.
+//   Fuzz       : hard asymmetric clip, slightly scooped mids.
 //
 // The colour filters of Tube, Tape and Fuzz grow with the drive: with
 // little drive the band stays open (flat to 15 kHz), the colour comes as
@@ -93,8 +93,18 @@ struct BandSettings
 inline float driveCourse (float drive, bool more) { return std::clamp (drive, 0.0f, 1.0f) + (more ? 1.0f : 0.0f); }
 inline float driveGainDb (float course) { return 40.0f * course; }   // 0..+80 dB
 
-// Extra gain built into a type (dB).
-inline float typeGainDb (Type t) { return t == Type::Fuzz ? 15.6f : 0.0f; }
+// Gain offset of each type (dB), so the same Drive gives about the same amount
+// of saturation on every type (v0.5: measured by the compression of a drum-like
+// signal and checked by ear against Transistor and Tube).
+inline float typeGainDb (Type t)
+{
+    switch (t)
+    {
+        case Type::Tape: return -3.0f;
+        case Type::Fuzz: return -4.0f;
+        default:         return 0.0f;
+    }
+}
 
 // The clipper of each type.
 inline float clipTransistor (float w)
@@ -191,7 +201,7 @@ public:
             }
             case Type::Tape:
             {
-                const float u = pre1.process (x, fl[0]) * (0.35f + 0.65f * gb * 0.25f);
+                const float u = pre1.process (x, fl[0]) * gb;
                 float h = clipTape (u / v + sagBias + 0.35f * st.hyst);
                 st.hyst = h;
                 h *= v;

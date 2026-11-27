@@ -1,4 +1,4 @@
-# Slapdash v0.4
+# Slapdash v0.4.1
 
 Saturation multibande de **Planet Gloria** (AAX pour Pro Tools, plus AU, VST3 et une app autonome pour tester), écrite avec JUCE. Même famille visuelle que Malade : interface dessinée à la main.
 
@@ -10,7 +10,8 @@ Saturation multibande de **Planet Gloria** (AAX pour Pro Tools, plus AU, VST3 et
     - **Transistor** : neutre. Écrêtage symétrique, aucun filtre.
     - **Tube** : un peu plus de médiums dans l'écrêtage, asymétrie qui grandit quand on attaque (harmoniques paires), haut adouci.
     - **Tape** : les aigus saturent en premier (accentuation / désaccentuation), hystérésis douce, petite bosse de tête vers 90 Hz.
-    - **Fuzz** : gain en plus, écrêtage dur asymétrique, médiums légèrement creusés.
+    - **Fuzz** : écrêtage dur asymétrique, médiums légèrement creusés.
+    - **Le Drive est calibré pareil sur les 4 types** : à réglage égal, à peu près autant de saturation, pour comparer les types sans retoucher le Drive.
     - La couleur des filtres grandit avec le Drive : peu de Drive = son ouvert (plat à ±1,5 dB jusqu'à 15 kHz à 30 %), la couleur vient quand on pousse. Le Transistor ne filtre jamais.
   - **Drive** (0 à +40 dB) et l'interrupteur **More**, qui prolonge la course : Drive à fond sans More = Drive à zéro avec More (jusqu'à +80 dB).
   - **Sag** : une alimentation qui se vide sur les attaques fortes (4 ms) et se recharge lentement (280 ms) : le point d'écrêtage baisse, l'attaque s'écrase, puis la note « respire ».
@@ -31,6 +32,10 @@ Saturation multibande de **Planet Gloria** (AAX pour Pro Tools, plus AU, VST3 et
 - Suréchantillonnage ×4 de toute la partie disto, pour éviter le repliement (aliasing).
 
 Réglages à l'ouverture : 1 module pleine bande, Split, on, Link OFF, Auto gain ON, Speaker sim OFF, Mono maker Off, Slapdash 9 V.
+
+## Nouveau en v0.4.1
+
+- **Drive calibré pareil sur tous les types.** Avant, Tape demandait environ 84 % pour saturer autant que Transistor ou Tube à 50 %, et Fuzz saturait déjà autant à 0 %. Tape reçoit maintenant le Drive à pleine échelle (−3 dB), Fuzz perd son gain fixe de +15,6 dB (−4 dB). Calage mesuré sur la compression d'un signal type batterie : les 4 types tombent à moins de 2,5 dB les uns des autres sur toute la course. Table de compensation refaite. Les sessions et presets en Tape ou Fuzz sonnent un peu différemment.
 
 ## Nouveau en v0.4
 
